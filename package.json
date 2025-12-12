@@ -1,0 +1,29 @@
+{
+  "name": "product-agent",
+  "version": "1.0.0",
+  "description": "Product Agent - handles product availability queries, synonym resolution, and sourcing recommendations",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "scrape": "tsx scripts/run-scraper.ts",
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": ["product", "agent", "easyprint", "magento"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.0",
+    "@mendable/firecrawl-js": "^1.4.3",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "googleapis": "^128.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0"
+  }
+}
