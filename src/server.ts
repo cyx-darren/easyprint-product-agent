@@ -13,10 +13,10 @@ export function createServer() {
 
   // Request logging
   app.use((req, _res, next) => {
-    logger.debug('Incoming request', {
+    logger.info('Incoming request', {
       method: req.method,
       path: req.path,
-      query: req.query,
+      body: req.body,
     });
     next();
   });

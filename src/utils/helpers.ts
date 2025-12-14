@@ -42,6 +42,42 @@ export function containsIgnoreCase(target: string, searchTerm: string): boolean 
 }
 
 /**
+ * Parse quantity from query text when not provided in request body
+ * Handles formats like: "5000pcs", "5,000 pieces", "5k pcs", "qty: 5000"
+ * Returns the largest quantity found (main order quantity)
+ */
+export function parseQuantityFromQuery(query: string): number | null {
+  if (!query) return null;
+
+  const text = query.toLowerCase();
+  const quantities: number[] = [];
+
+  // Pattern 1: Numbers followed by pcs/pieces/units (e.g., "5000pcs", "5,000 pieces")
+  const matches1 = text.matchAll(/(\d{1,3}(?:,\d{3})+|\d+)\s*(?:pcs|pieces|units)/gi);
+  for (const match of matches1) {
+    const num = parseInt(match[1].replace(/,/g, ''), 10);
+    if (num > 0) quantities.push(num);
+  }
+
+  // Pattern 2: "5k pcs" format
+  const matches2 = text.matchAll(/(\d+)k\s*(?:pcs|pieces|units)?/gi);
+  for (const match of matches2) {
+    const num = parseInt(match[1], 10) * 1000;
+    if (num > 0) quantities.push(num);
+  }
+
+  // Pattern 3: "quantity: 5000" or "qty 5000"
+  const matches3 = text.matchAll(/(?:quantity|qty)[:\s]+(\d{1,3}(?:,\d{3})+|\d+)/gi);
+  for (const match of matches3) {
+    const num = parseInt(match[1].replace(/,/g, ''), 10);
+    if (num > 0) quantities.push(num);
+  }
+
+  // Return largest quantity (main order quantity)
+  return quantities.length > 0 ? Math.max(...quantities) : null;
+}
+
+/**
  * Generate a human-readable summary for availability response
  */
 export function generateAvailabilitySummary(

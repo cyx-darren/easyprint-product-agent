@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { parserService, matcherService, cacheService } from '../../services/index.js';
 import { createError } from '../middleware/error.js';
-import { generateAvailabilitySummary } from '../../utils/helpers.js';
+import { generateAvailabilitySummary, parseQuantityFromQuery } from '../../utils/helpers.js';
+import { logger } from '../../utils/logger.js';
 import {
   ProductSearchRequest,
   ProductSearchResponse,
@@ -22,6 +23,8 @@ export async function searchProducts(
   try {
     const { query, includeSourcing = true } = req.body;
 
+    logger.info('Product search request', { query, includeSourcing });
+
     if (!query) {
       throw createError('Query is required', 400, 'INVALID_REQUEST', { field: 'query' });
     }
@@ -32,6 +35,19 @@ export async function searchProducts(
 
     // Find products
     const products = matcherService.findProducts(effectiveQuery);
+
+    // Log sourcing summary for each product
+    const sourcingSummary = products.map((p) => ({
+      name: p.name,
+      localAvailable: !!p.sourcing.local.supplier,
+      chinaAvailable: p.sourcing.china.available,
+    }));
+    logger.info('Product search results', {
+      query,
+      synonymResolved,
+      totalFound: products.length,
+      products: sourcingSummary,
+    });
 
     const response: ProductSearchResponse = {
       query,
@@ -78,10 +94,21 @@ export async function checkAvailability(
   next: NextFunction
 ): Promise<void> {
   try {
-    const { query, quantity, urgent = false } = req.body;
+    let { query, quantity, urgent = false } = req.body;
+
+    logger.info('Availability check request', { query, quantity, urgent });
 
     if (!query) {
       throw createError('Query is required', 400, 'INVALID_REQUEST', { field: 'query' });
+    }
+
+    // If quantity not provided in request body, parse from query text
+    if (quantity === null || quantity === undefined) {
+      const parsedQuantity = parseQuantityFromQuery(query);
+      if (parsedQuantity !== null) {
+        quantity = parsedQuantity;
+        logger.info(`Parsed quantity ${quantity} from query: "${query}"`);
+      }
     }
 
     // Parse query using Claude
@@ -102,6 +129,20 @@ export async function checkAvailability(
     const colorAvailable = matches.some(
       (m) => m.colorMatch.onWebsite || m.colorMatch.fromLocal || m.colorMatch.fromChina
     );
+
+    // Log recommendations summary
+    const recommendationsSummary = matches.map((m) => ({
+      product: m.product.name,
+      recommendedSource: m.recommendation.source,
+      supplier: m.recommendation.supplier,
+      leadTime: m.recommendation.leadTime,
+    }));
+    logger.info('Availability check results', {
+      query,
+      parsed: { product: parsed.productType, color: parsed.color, quantity: quantity || parsed.quantity },
+      totalMatches: matches.length,
+      recommendations: recommendationsSummary,
+    });
 
     // Generate summary
     let summary: string;
