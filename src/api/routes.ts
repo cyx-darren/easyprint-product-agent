@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from './middleware/auth.js';
-import { searchProducts, checkAvailability, getSynonyms } from './controllers/product.js';
+import { searchProducts, checkAvailability, checkMultiAvailability, getSynonyms } from './controllers/product.js';
 import { runScraper } from './controllers/scraper.js';
 import { refreshCache } from './controllers/cache.js';
 import { cacheService } from '../services/index.js';
@@ -31,6 +31,7 @@ router.use(authMiddleware);
 // Product endpoints
 router.post('/api/product/search', searchProducts);
 router.post('/api/product/availability', checkAvailability);
+router.post('/api/product/availability-multi', checkMultiAvailability);
 router.get('/api/product/synonyms', getSynonyms);
 
 // Scraper endpoints

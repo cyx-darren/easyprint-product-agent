@@ -3,8 +3,9 @@
 ## Document Info
 | Field | Value |
 |-------|-------|
-| Version | 1.0 |
+| Version | 1.1 |
 | Created | December 11, 2025 |
+| Updated | December 15, 2025 |
 | Status | Ready for Implementation |
 | Project | product-agent |
 
@@ -63,6 +64,7 @@ This project includes:
 │  │                                                          │   │
 │  │  POST /api/product/search                               │   │
 │  │  POST /api/product/availability                         │   │
+│  │  POST /api/product/availability-multi  (NEW)            │   │
 │  │  GET  /api/product/synonyms                             │   │
 │  │  POST /api/scraper/run                                  │   │
 │  │                                                          │   │
@@ -532,7 +534,95 @@ Response:
 }
 ```
 
-#### 5.1.4 Synonyms List
+#### 5.1.4 Multi-Product Availability Check (NEW)
+
+Handles queries containing multiple products in a single request. Each product is parsed and resolved independently.
+
+```
+POST /api/product/availability-multi
+
+Request:
+{
+  "query": "1,500 pcs t-shirts, 500 pcs hoodies",
+  "urgent": false
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "query": "1,500 pcs t-shirts, 500 pcs hoodies",
+    "totalProductsRequested": 2,
+    "totalProductsFound": 2,
+    "results": [
+      {
+        "originalQuery": "1500 pcs t-shirts",
+        "parsed": {
+          "product": "t-shirts",
+          "color": null,
+          "quantity": 1500,
+          "urgent": false
+        },
+        "synonymResolved": "T-Shirt",
+        "availability": {
+          "found": true,
+          "colorAvailable": true,
+          "matchingProducts": [
+            {
+              "name": "100% Cotton T-Shirts",
+              "recommendation": {
+                "source": "local",
+                "supplier": "Orensport",
+                "leadTime": "5-10 days"
+              }
+            }
+          ]
+        },
+        "summary": "100% Cotton T-Shirts available from Orensport (local supplier). For 1500 pieces: 5-10 days lead time."
+      },
+      {
+        "originalQuery": "500 pcs hoodies",
+        "parsed": {
+          "product": "hoodies",
+          "color": null,
+          "quantity": 500,
+          "urgent": false
+        },
+        "synonymResolved": "Hooded Sweatshirt",
+        "availability": {
+          "found": true,
+          "colorAvailable": true,
+          "matchingProducts": [
+            {
+              "name": "Hooded Sweatshirt",
+              "recommendation": {
+                "source": "local",
+                "supplier": "Jespa",
+                "leadTime": "5-10 days"
+              }
+            }
+          ]
+        },
+        "summary": "Hooded Sweatshirt available from Jespa (local supplier). For 500 pieces: 5-10 days lead time."
+      }
+    ],
+    "combinedSummary": "Available: 100% Cotton T-Shirts (1500 pcs) from Orensport, Hooded Sweatshirt (500 pcs) from Jespa."
+  }
+}
+```
+
+**Use Cases:**
+- Customer requests multiple product types in one query
+- Batch availability checks from Discord tickets
+- Orders containing mixed product categories
+
+**Key Features:**
+- Parses multiple products using Claude AI
+- Resolves synonyms independently for each product
+- Generates individual summaries per product
+- Provides combined summary for entire order
+
+#### 5.1.5 Synonyms List
 
 ```
 GET /api/product/synonyms
@@ -553,7 +643,7 @@ Response:
 }
 ```
 
-#### 5.1.5 Run Scraper
+#### 5.1.6 Run Scraper
 
 ```
 POST /api/scraper/run
@@ -582,7 +672,7 @@ Response:
 }
 ```
 
-#### 5.1.6 Refresh Cache
+#### 5.1.7 Refresh Cache
 
 ```
 POST /api/cache/refresh
@@ -931,6 +1021,21 @@ POST /api/product/availability
 POST /api/product/search
 { "query": "flying carpet" }
 // Expect: No results, helpful message
+
+// Multi-product availability (NEW)
+POST /api/product/availability-multi
+{ "query": "1,500 pcs t-shirts, 500 pcs hoodies" }
+// Expect: Both products resolved, individual summaries, combined summary
+
+// Multi-product with colors
+POST /api/product/availability-multi
+{ "query": "200 red USB drives and 100 blue pens" }
+// Expect: Separate results for USB drives and pens with colors
+
+// Multi-product partial match
+POST /api/product/availability-multi
+{ "query": "1000 t-shirts and 500 unicorn horns" }
+// Expect: t-shirts found, unicorn horns not found, partial results
 ```
 
 ---

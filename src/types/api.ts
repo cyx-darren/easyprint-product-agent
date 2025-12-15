@@ -125,3 +125,46 @@ export interface ParsedQuery {
   quantity: number | null;
   urgent: boolean;
 }
+
+// Multi-product support types
+export interface ParsedQueryItem {
+  productType: string;
+  color: string | null;
+  quantity: number | null;
+  urgent: boolean;
+}
+
+export interface MultiParsedQuery {
+  items: ParsedQueryItem[];
+  globalUrgent: boolean;
+}
+
+export interface MultiAvailabilityRequest {
+  query: string;
+  urgent?: boolean;
+}
+
+export interface ProductAvailabilityResult {
+  originalQuery: string;
+  parsed: {
+    product: string;
+    color: string | null;
+    quantity: number | null;
+    urgent: boolean;
+  };
+  synonymResolved: string | null;
+  availability: {
+    found: boolean;
+    colorAvailable: boolean;
+    matchingProducts: ProductMatch[];
+  };
+  summary: string;
+}
+
+export interface MultiAvailabilityResponse {
+  query: string;
+  totalProductsRequested: number;
+  totalProductsFound: number;
+  results: ProductAvailabilityResult[];
+  combinedSummary: string;
+}

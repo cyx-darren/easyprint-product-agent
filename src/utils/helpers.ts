@@ -159,3 +159,42 @@ export function generateAvailabilitySummary(
     return `${colorPart}${productName} recommended from China.${qtyPart}: better pricing for larger quantities.`;
   }
 }
+
+/**
+ * Generate a combined summary for multiple product availability results
+ */
+export function generateMultiAvailabilitySummary(
+  results: Array<{
+    productName: string;
+    color: string | null;
+    found: boolean;
+    source?: 'local' | 'china';
+    supplier?: string;
+    quantity: number | null;
+  }>
+): string {
+  const found = results.filter((r) => r.found);
+  const notFound = results.filter((r) => !r.found);
+
+  const parts: string[] = [];
+
+  if (found.length > 0) {
+    const foundSummaries = found.map((r) => {
+      const colorPart = r.color ? `${r.color} ` : '';
+      const qtyPart = r.quantity ? ` (${r.quantity} pcs)` : '';
+      const sourcePart = r.source === 'china' ? ' from China' : r.supplier ? ` from ${r.supplier}` : '';
+      return `${colorPart}${r.productName}${qtyPart}${sourcePart}`;
+    });
+    parts.push(`Available: ${foundSummaries.join(', ')}.`);
+  }
+
+  if (notFound.length > 0) {
+    const notFoundNames = notFound.map((r) => {
+      const colorPart = r.color ? `${r.color} ` : '';
+      return `${colorPart}${r.productName}`;
+    });
+    parts.push(`Not found: ${notFoundNames.join(', ')}. Please check product names or try different search terms.`);
+  }
+
+  return parts.join(' ');
+}

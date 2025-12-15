@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { parserService, matcherService, cacheService } from '../../services/index.js';
 import { createError } from '../middleware/error.js';
-import { generateAvailabilitySummary, parseQuantityFromQuery } from '../../utils/helpers.js';
+import { generateAvailabilitySummary, generateMultiAvailabilitySummary, parseQuantityFromQuery } from '../../utils/helpers.js';
 import { logger } from '../../utils/logger.js';
 import {
   ProductSearchRequest,
@@ -9,6 +9,9 @@ import {
   AvailabilityRequest,
   AvailabilityResponse,
   SynonymsResponse,
+  MultiAvailabilityRequest,
+  MultiAvailabilityResponse,
+  ProductAvailabilityResult,
 } from '../../types/api.js';
 
 /**
@@ -192,6 +195,137 @@ export async function checkAvailability(
         })),
       },
       summary,
+    };
+
+    res.json({ success: true, data: response });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/product/availability-multi
+ * Check availability for MULTIPLE products in a single query
+ */
+export async function checkMultiAvailability(
+  req: Request<{}, {}, MultiAvailabilityRequest>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { query, urgent = false } = req.body;
+
+    logger.info('Multi-availability check request', { query, urgent });
+
+    if (!query) {
+      throw createError('Query is required', 400, 'INVALID_REQUEST', { field: 'query' });
+    }
+
+    // Parse query for multiple products
+    const multiParsed = await parserService.parseMultiQuery(query);
+
+    // Apply global urgency if set in request
+    const effectiveUrgent = urgent || multiParsed.globalUrgent;
+
+    const results: ProductAvailabilityResult[] = [];
+
+    // Process each product item
+    for (const item of multiParsed.items) {
+      // Try to resolve synonym
+      const synonymResolved = matcherService.resolveSynonym(item.productType);
+      const effectiveProductType = synonymResolved || item.productType;
+
+      // Get product matches
+      const matches = matcherService.getProductMatches(
+        effectiveProductType,
+        item.color,
+        item.quantity,
+        item.urgent || effectiveUrgent
+      );
+
+      // Determine color availability
+      const colorAvailable = matches.some(
+        (m) => m.colorMatch.onWebsite || m.colorMatch.fromLocal || m.colorMatch.fromChina
+      );
+
+      // Generate individual summary
+      let summary: string;
+      if (matches.length === 0) {
+        summary = `No products found matching "${item.productType}".`;
+      } else if (item.color && !colorAvailable) {
+        summary = `"${item.productType}" found, but ${item.color} color not available.`;
+      } else {
+        const firstMatch = matches[0];
+        summary = generateAvailabilitySummary(
+          firstMatch.product.name,
+          item.color,
+          firstMatch.recommendation.source,
+          firstMatch.recommendation.supplier,
+          firstMatch.recommendation.leadTime,
+          item.quantity
+        );
+      }
+
+      // Build original query segment for this item
+      const qtyPart = item.quantity ? `${item.quantity} pcs ` : '';
+      const colorPart = item.color ? `${item.color} ` : '';
+      const originalQuery = `${qtyPart}${colorPart}${item.productType}`.trim();
+
+      results.push({
+        originalQuery,
+        parsed: {
+          product: item.productType,
+          color: item.color,
+          quantity: item.quantity,
+          urgent: item.urgent || effectiveUrgent,
+        },
+        synonymResolved,
+        availability: {
+          found: matches.length > 0,
+          colorAvailable,
+          matchingProducts: matches,
+        },
+        summary,
+      });
+    }
+
+    // Log results summary
+    const resultsSummary = results.map((r) => ({
+      product: r.parsed.product,
+      synonymResolved: r.synonymResolved,
+      found: r.availability.found,
+      matchCount: r.availability.matchingProducts.length,
+    }));
+    logger.info('Multi-availability check results', {
+      query,
+      totalProducts: results.length,
+      results: resultsSummary,
+    });
+
+    // Generate combined summary
+    const combinedSummary = generateMultiAvailabilitySummary(
+      results.map((r) => ({
+        productName: r.availability.found
+          ? r.availability.matchingProducts[0].product.name
+          : r.parsed.product,
+        color: r.parsed.color,
+        found: r.availability.found,
+        source: r.availability.found
+          ? r.availability.matchingProducts[0].recommendation.source
+          : undefined,
+        supplier: r.availability.found
+          ? r.availability.matchingProducts[0].recommendation.supplier
+          : undefined,
+        quantity: r.parsed.quantity,
+      }))
+    );
+
+    const response: MultiAvailabilityResponse = {
+      query,
+      totalProductsRequested: results.length,
+      totalProductsFound: results.filter((r) => r.availability.found).length,
+      results,
+      combinedSummary,
     };
 
     res.json({ success: true, data: response });
