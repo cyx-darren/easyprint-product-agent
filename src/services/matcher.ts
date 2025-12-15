@@ -1,38 +1,44 @@
 import { Product, Synonym, ColorAvailability, SourcingRecommendation, ProductMatch } from '../types/product.js';
 import { cacheService } from './cache.js';
 import { logger } from '../utils/logger.js';
-import { containsIgnoreCase, normalize } from '../utils/helpers.js';
+import { containsIgnoreCase, normalize, normalizeForSynonym } from '../utils/helpers.js';
 
 class MatcherService {
   /**
    * Resolve a customer term to internal product name using synonyms
+   * Handles pluralization automatically (e.g., "t-shirts" matches "t-shirt")
    */
   resolveSynonym(term: string): string | null {
     const synonyms = cacheService.getSynonyms();
-    const normalizedTerm = normalize(term);
+    const termVariants = normalizeForSynonym(term);
 
-    // Direct match
-    const directMatch = synonyms.find(
-      (s) => normalize(s.customerSays) === normalizedTerm
-    );
-    if (directMatch) {
-      logger.debug('Synonym resolved (direct match)', {
-        from: term,
-        to: directMatch.weCallIt,
-      });
-      return directMatch.weCallIt;
+    // Try each variant (original and singularized)
+    for (const normalizedTerm of termVariants) {
+      // Direct match
+      const directMatch = synonyms.find(
+        (s) => normalizeForSynonym(s.customerSays).some(v => v === normalizedTerm)
+      );
+      if (directMatch) {
+        logger.debug('Synonym resolved (direct match)', {
+          from: term,
+          to: directMatch.weCallIt,
+        });
+        return directMatch.weCallIt;
+      }
     }
 
-    // Partial match (term contains synonym)
-    const partialMatch = synonyms.find((s) =>
-      normalizedTerm.includes(normalize(s.customerSays))
-    );
-    if (partialMatch) {
-      logger.debug('Synonym resolved (partial match)', {
-        from: term,
-        to: partialMatch.weCallIt,
-      });
-      return partialMatch.weCallIt;
+    // Partial match (term contains synonym) - try with variants
+    for (const normalizedTerm of termVariants) {
+      const partialMatch = synonyms.find((s) =>
+        normalizeForSynonym(s.customerSays).some(v => normalizedTerm.includes(v))
+      );
+      if (partialMatch) {
+        logger.debug('Synonym resolved (partial match)', {
+          from: term,
+          to: partialMatch.weCallIt,
+        });
+        return partialMatch.weCallIt;
+      }
     }
 
     return null;

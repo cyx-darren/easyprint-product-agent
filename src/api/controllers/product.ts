@@ -111,15 +111,24 @@ export async function checkAvailability(
       }
     }
 
+    // Try to resolve synonym on original query FIRST (before Claude loses context)
+    const synonymFromQuery = matcherService.resolveSynonym(query);
+
     // Parse query using Claude
     const parsed = await parserService.parseQuery(query);
 
-    // Resolve synonym
-    const synonymResolved = matcherService.resolveSynonym(parsed.productType);
+    // Also try to resolve synonym on parsed product type
+    const synonymFromParsed = matcherService.resolveSynonym(parsed.productType);
+
+    // Use whichever synonym resolved (prefer original query match)
+    const synonymResolved = synonymFromQuery || synonymFromParsed;
+
+    // Determine effective search term (synonym takes priority)
+    const effectiveProductType = synonymResolved || parsed.productType;
 
     // Get product matches with recommendations
     const matches = matcherService.getProductMatches(
-      parsed.productType,
+      effectiveProductType,
       parsed.color,
       quantity || parsed.quantity,
       urgent || parsed.urgent
@@ -140,6 +149,8 @@ export async function checkAvailability(
     logger.info('Availability check results', {
       query,
       parsed: { product: parsed.productType, color: parsed.color, quantity: quantity || parsed.quantity },
+      synonymResolved,
+      effectiveProductType,
       totalMatches: matches.length,
       recommendations: recommendationsSummary,
     });

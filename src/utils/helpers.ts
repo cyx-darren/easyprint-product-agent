@@ -35,6 +35,66 @@ export function normalize(value: string): string {
 }
 
 /**
+ * Convert a word to its singular form (basic pluralization handling)
+ * Handles common patterns: t-shirts -> t-shirt, pencils -> pencil, bags -> bag
+ */
+export function singularize(word: string): string {
+  // Strip trailing punctuation before processing
+  const lower = word.toLowerCase().trim().replace(/[,.:;!?]+$/, '');
+
+  // Common irregular plurals
+  const irregulars: Record<string, string> = {
+    'mice': 'mouse',
+    'dice': 'die',
+    'children': 'child',
+    'people': 'person',
+  };
+
+  if (irregulars[lower]) {
+    return irregulars[lower];
+  }
+
+  // Words ending in 'ies' -> 'y' (e.g., 'batteries' -> 'battery')
+  if (lower.endsWith('ies') && lower.length > 4) {
+    return lower.slice(0, -3) + 'y';
+  }
+
+  // Words ending in 'es' after s, x, z, ch, sh -> remove 'es'
+  if (lower.endsWith('shes') || lower.endsWith('ches') ||
+      lower.endsWith('xes') || lower.endsWith('zes') ||
+      lower.endsWith('sses')) {
+    return lower.slice(0, -2);
+  }
+
+  // Words ending in 's' but not 'ss' -> remove 's'
+  if (lower.endsWith('s') && !lower.endsWith('ss') && lower.length > 2) {
+    return lower.slice(0, -1);
+  }
+
+  return lower;
+}
+
+/**
+ * Normalize a term for synonym matching (handles plurals)
+ * Returns both normalized original and singularized versions
+ */
+export function normalizeForSynonym(term: string): string[] {
+  const normalized = normalize(term);
+  const words = normalized.split(' ');
+
+  // Singularize each word and rebuild
+  const singularized = words.map(w => singularize(w)).join(' ');
+
+  // Return unique variants
+  const variants = [normalized];
+  if (singularized !== normalized) {
+    variants.push(singularized);
+  }
+
+  return variants;
+}
+
+/**
  * Check if searchTerm is contained in target (case-insensitive)
  */
 export function containsIgnoreCase(target: string, searchTerm: string): boolean {
