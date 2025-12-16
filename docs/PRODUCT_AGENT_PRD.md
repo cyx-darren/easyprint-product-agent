@@ -3,9 +3,9 @@
 ## Document Info
 | Field | Value |
 |-------|-------|
-| Version | 1.1 |
+| Version | 1.2 |
 | Created | December 11, 2025 |
-| Updated | December 15, 2025 |
+| Updated | December 16, 2025 |
 | Status | Ready for Implementation |
 | Project | product-agent |
 
@@ -64,7 +64,8 @@ This project includes:
 │  │                                                          │   │
 │  │  POST /api/product/search                               │   │
 │  │  POST /api/product/availability                         │   │
-│  │  POST /api/product/availability-multi  (NEW)            │   │
+│  │  POST /api/product/availability-multi                   │   │
+│  │  POST /api/product/resolve  (NEW - for Price Agent)     │   │
 │  │  GET  /api/product/synonyms                             │   │
 │  │  POST /api/scraper/run                                  │   │
 │  │                                                          │   │
@@ -622,7 +623,71 @@ Response:
 - Generates individual summaries per product
 - Provides combined summary for entire order
 
-#### 5.1.5 Synonyms List
+#### 5.1.5 Product Term Resolution (NEW)
+
+Lightweight endpoint that resolves customer terminology to canonical product names. Used by Price Agent to get correct product names before querying pricing.
+
+```
+POST /api/product/resolve
+
+Request:
+{
+  "terms": ["hoodie", "t-shirts", "badge case"]
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "resolutions": [
+      {
+        "input": "hoodie",
+        "canonicalName": "Hooded Sweatshirt",
+        "confidence": "synonym",
+        "alternates": [],
+        "category": "Apparel Headwear"
+      },
+      {
+        "input": "t-shirts",
+        "canonicalName": "100% Cotton T-Shirts",
+        "confidence": "fuzzy",
+        "alternates": ["Custom Dri-Fit T-shirts"],
+        "category": "Apparel Headwear"
+      },
+      {
+        "input": "badge case",
+        "canonicalName": "Card Holder",
+        "confidence": "synonym",
+        "alternates": ["Leather Mobile Card Holder", "Hotel Card Holder"],
+        "category": "Electronics Gadgets"
+      }
+    ]
+  }
+}
+```
+
+**Confidence Levels:**
+
+| Level | When Used |
+|-------|-----------|
+| `exact` | Input exactly matches a canonical product name |
+| `synonym` | Input matched via synonym mapping in Google Sheet |
+| `fuzzy` | Input matched via partial/substring search |
+| `not_found` | No match found - `canonicalName` will be `null` |
+
+**Use Cases:**
+- Price Agent needs correct product names before querying Supabase
+- Orchestrator pre-resolves terms before calling multiple agents
+- Batch resolution of multiple customer terms in one request
+
+**Key Features:**
+- Lightweight - no availability/sourcing lookups
+- Fast - target <200ms response time
+- Batch support - accepts array of terms
+- Returns alternates when multiple products match
+- Returns category for each resolved term
+
+#### 5.1.6 Synonyms List
 
 ```
 GET /api/product/synonyms
@@ -643,7 +708,7 @@ Response:
 }
 ```
 
-#### 5.1.6 Run Scraper
+#### 5.1.7 Run Scraper
 
 ```
 POST /api/scraper/run
@@ -672,7 +737,7 @@ Response:
 }
 ```
 
-#### 5.1.7 Refresh Cache
+#### 5.1.8 Refresh Cache
 
 ```
 POST /api/cache/refresh
@@ -1036,6 +1101,26 @@ POST /api/product/availability-multi
 POST /api/product/availability-multi
 { "query": "1000 t-shirts and 500 unicorn horns" }
 // Expect: t-shirts found, unicorn horns not found, partial results
+
+// Term resolution - synonym (NEW)
+POST /api/product/resolve
+{ "terms": ["hoodie"] }
+// Expect: canonicalName = "Hooded Sweatshirt", confidence = "synonym"
+
+// Term resolution - exact match (NEW)
+POST /api/product/resolve
+{ "terms": ["Hooded Sweatshirt"] }
+// Expect: canonicalName = "Hooded Sweatshirt", confidence = "exact"
+
+// Term resolution - batch (NEW)
+POST /api/product/resolve
+{ "terms": ["hoodie", "t-shirts", "badge case"] }
+// Expect: All three resolved with appropriate confidence levels
+
+// Term resolution - not found (NEW)
+POST /api/product/resolve
+{ "terms": ["flying carpet"] }
+// Expect: canonicalName = null, confidence = "not_found"
 ```
 
 ---
