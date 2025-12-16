@@ -172,7 +172,8 @@ export async function checkAvailability(
         firstMatch.recommendation.source,
         firstMatch.recommendation.supplier,
         firstMatch.recommendation.leadTime,
-        quantity || parsed.quantity
+        quantity || parsed.quantity,
+        firstMatch.recommendation.warning
       );
     }
 
@@ -262,7 +263,8 @@ export async function checkMultiAvailability(
           firstMatch.recommendation.source,
           firstMatch.recommendation.supplier,
           firstMatch.recommendation.leadTime,
-          item.quantity
+          item.quantity,
+          firstMatch.recommendation.warning
         );
       }
 
@@ -317,6 +319,9 @@ export async function checkMultiAvailability(
           ? r.availability.matchingProducts[0].recommendation.supplier
           : undefined,
         quantity: r.parsed.quantity,
+        warning: r.availability.found
+          ? r.availability.matchingProducts[0].recommendation.warning
+          : undefined,
       }))
     );
 

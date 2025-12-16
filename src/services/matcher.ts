@@ -126,8 +126,31 @@ class MatcherService {
   ): SourcingRecommendation {
     const { local, china } = product.sourcing;
 
-    // No China option available
-    if (!china.available) {
+    // Check if local sourcing info exists (supplier name is filled)
+    const hasLocalSourcing = !!local.supplier && local.supplier.trim() !== '';
+    // Check if China sourcing is available
+    const hasChinaSourcing = china.available;
+
+    // BOTH local and China sourcing info are empty - return warning
+    if (!hasLocalSourcing && !hasChinaSourcing) {
+      return {
+        source: 'unknown',
+        reason: 'No sourcing information available',
+        warning: `⚠️ WARNING: Both local and China sourcing details are missing for "${product.name}". Please update the Google Sheet with supplier information.`,
+      };
+    }
+
+    // Local not available but China is - recommend China
+    if (!hasLocalSourcing && hasChinaSourcing) {
+      return {
+        source: 'china',
+        moq: china.moq || undefined,
+        reason: 'Local supplier not available - sourcing from China',
+      };
+    }
+
+    // No China option available - use local
+    if (!hasChinaSourcing) {
       return {
         source: 'local',
         supplier: local.supplier || undefined,
@@ -137,7 +160,9 @@ class MatcherService {
       };
     }
 
-    // Urgent - always local
+    // Both are available - apply normal logic based on urgency and quantity
+
+    // Urgent - prefer local for faster delivery
     if (urgent) {
       return {
         source: 'local',

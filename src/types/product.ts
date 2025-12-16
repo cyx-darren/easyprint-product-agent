@@ -45,11 +45,12 @@ export interface ColorAvailability {
 }
 
 export interface SourcingRecommendation {
-  source: 'local' | 'china';
+  source: 'local' | 'china' | 'unknown';
   supplier?: string;
   moq?: number;
   leadTime?: string;
   reason: string;
+  warning?: string;
 }
 
 export interface ProductMatch {

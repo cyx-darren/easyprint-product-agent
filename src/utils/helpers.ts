@@ -143,13 +143,18 @@ export function parseQuantityFromQuery(query: string): number | null {
 export function generateAvailabilitySummary(
   productName: string,
   color: string | null,
-  source: 'local' | 'china',
+  source: 'local' | 'china' | 'unknown',
   supplier: string | undefined,
   leadTime: string | undefined,
-  quantity: number | null
+  quantity: number | null,
+  warning?: string
 ): string {
   const colorPart = color ? `${color} ` : '';
   const qtyPart = quantity ? ` For ${quantity} pieces` : '';
+
+  if (source === 'unknown') {
+    return warning || `${colorPart}${productName} found but sourcing information is missing. Please update the product data.`;
+  }
 
   if (source === 'local') {
     const supplierPart = supplier ? ` from ${supplier} (local supplier)` : ' from local supplier';
@@ -168,13 +173,15 @@ export function generateMultiAvailabilitySummary(
     productName: string;
     color: string | null;
     found: boolean;
-    source?: 'local' | 'china';
+    source?: 'local' | 'china' | 'unknown';
     supplier?: string;
     quantity: number | null;
+    warning?: string;
   }>
 ): string {
-  const found = results.filter((r) => r.found);
+  const found = results.filter((r) => r.found && r.source !== 'unknown');
   const notFound = results.filter((r) => !r.found);
+  const unknownSourcing = results.filter((r) => r.found && r.source === 'unknown');
 
   const parts: string[] = [];
 
@@ -186,6 +193,14 @@ export function generateMultiAvailabilitySummary(
       return `${colorPart}${r.productName}${qtyPart}${sourcePart}`;
     });
     parts.push(`Available: ${foundSummaries.join(', ')}.`);
+  }
+
+  if (unknownSourcing.length > 0) {
+    const unknownSummaries = unknownSourcing.map((r) => {
+      const colorPart = r.color ? `${r.color} ` : '';
+      return `${colorPart}${r.productName}`;
+    });
+    parts.push(`⚠️ Sourcing info missing: ${unknownSummaries.join(', ')}. Please update Google Sheet with supplier details.`);
   }
 
   if (notFound.length > 0) {
