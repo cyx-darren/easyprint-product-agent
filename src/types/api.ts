@@ -168,3 +168,20 @@ export interface MultiAvailabilityResponse {
   results: ProductAvailabilityResult[];
   combinedSummary: string;
 }
+
+// Product term resolution (for Price Agent)
+export interface ResolveRequest {
+  terms: string[];
+}
+
+export interface ProductResolution {
+  input: string;
+  canonicalName: string | null;
+  confidence: 'exact' | 'synonym' | 'fuzzy' | 'not_found';
+  alternates: string[];
+  category: string | null;
+}
+
+export interface ResolveResponse {
+  resolutions: ProductResolution[];
+}

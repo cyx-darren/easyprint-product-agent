@@ -12,6 +12,8 @@ import {
   MultiAvailabilityRequest,
   MultiAvailabilityResponse,
   ProductAvailabilityResult,
+  ResolveRequest,
+  ResolveResponse,
 } from '../../types/api.js';
 
 /**
@@ -357,6 +359,46 @@ export async function getSynonyms(
         weCallIt: s.weCallIt,
       })),
       total: synonyms.length,
+    };
+
+    res.json({ success: true, data: response });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * POST /api/product/resolve
+ * Resolve customer terms to canonical product names
+ * Used by Price Agent to get correct product names before querying pricing
+ */
+export async function resolveTerms(
+  req: Request<{}, {}, ResolveRequest>,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { terms } = req.body;
+
+    if (!terms || !Array.isArray(terms)) {
+      throw createError('terms must be an array', 400, 'INVALID_REQUEST', { field: 'terms' });
+    }
+
+    const resolutions = matcherService.resolveTerms(terms);
+
+    logger.info('Resolve terms request', {
+      termsCount: terms.length,
+      foundCount: resolutions.filter((r) => r.confidence !== 'not_found').length,
+      terms: terms,
+      resolutions: resolutions.map((r) => ({
+        input: r.input,
+        canonicalName: r.canonicalName,
+        confidence: r.confidence,
+      })),
+    });
+
+    const response: ResolveResponse = {
+      resolutions,
     };
 
     res.json({ success: true, data: response });

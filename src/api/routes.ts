@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authMiddleware } from './middleware/auth.js';
-import { searchProducts, checkAvailability, checkMultiAvailability, getSynonyms } from './controllers/product.js';
+import { searchProducts, checkAvailability, checkMultiAvailability, getSynonyms, resolveTerms } from './controllers/product.js';
 import { runScraper } from './controllers/scraper.js';
 import { refreshCache } from './controllers/cache.js';
 import { cacheService } from '../services/index.js';
@@ -32,6 +32,7 @@ router.use(authMiddleware);
 router.post('/api/product/search', searchProducts);
 router.post('/api/product/availability', checkAvailability);
 router.post('/api/product/availability-multi', checkMultiAvailability);
+router.post('/api/product/resolve', resolveTerms);
 router.get('/api/product/synonyms', getSynonyms);
 
 // Scraper endpoints

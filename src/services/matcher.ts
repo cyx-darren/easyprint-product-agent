@@ -1,4 +1,5 @@
 import { Product, Synonym, ColorAvailability, SourcingRecommendation, ProductMatch } from '../types/product.js';
+import { ProductResolution } from '../types/api.js';
 import { cacheService } from './cache.js';
 import { logger } from '../utils/logger.js';
 import { containsIgnoreCase, normalize, normalizeForSynonym } from '../utils/helpers.js';
@@ -234,6 +235,74 @@ class MatcherService {
         recommendation,
       };
     });
+  }
+
+  /**
+   * Resolve a single term to canonical product name with confidence level
+   * Used by /api/product/resolve endpoint for Price Agent integration
+   */
+  resolveTerm(term: string): ProductResolution {
+    const products = cacheService.getProducts();
+    const normalized = normalize(term);
+
+    // 1. Exact match on product name
+    const exactMatch = products.find((p) => normalize(p.name) === normalized);
+    if (exactMatch) {
+      logger.debug('Term resolved (exact match)', { term, canonicalName: exactMatch.name });
+      return {
+        input: term,
+        canonicalName: exactMatch.name,
+        confidence: 'exact',
+        alternates: [],
+        category: exactMatch.category,
+      };
+    }
+
+    // 2. Synonym resolution
+    const synonymResolved = this.resolveSynonym(term);
+    if (synonymResolved) {
+      const matchingProducts = this.findProducts(synonymResolved);
+      const primary = matchingProducts[0];
+      logger.debug('Term resolved (synonym)', { term, canonicalName: synonymResolved });
+      return {
+        input: term,
+        canonicalName: synonymResolved,
+        confidence: 'synonym',
+        alternates: matchingProducts.slice(1, 4).map((p) => p.name),
+        category: primary?.category || null,
+      };
+    }
+
+    // 3. Fuzzy/partial match via findProducts
+    const fuzzyMatches = this.findProducts(term);
+    if (fuzzyMatches.length > 0) {
+      logger.debug('Term resolved (fuzzy)', { term, canonicalName: fuzzyMatches[0].name });
+      return {
+        input: term,
+        canonicalName: fuzzyMatches[0].name,
+        confidence: 'fuzzy',
+        alternates: fuzzyMatches.slice(1, 4).map((p) => p.name),
+        category: fuzzyMatches[0].category,
+      };
+    }
+
+    // 4. Not found
+    logger.debug('Term not resolved', { term });
+    return {
+      input: term,
+      canonicalName: null,
+      confidence: 'not_found',
+      alternates: [],
+      category: null,
+    };
+  }
+
+  /**
+   * Resolve multiple terms to canonical product names
+   * Batch processing for efficiency
+   */
+  resolveTerms(terms: string[]): ProductResolution[] {
+    return terms.map((term) => this.resolveTerm(term));
   }
 }
 
